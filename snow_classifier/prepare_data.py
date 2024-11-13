@@ -1,7 +1,10 @@
+import random
 from datetime import datetime
 from pathlib import Path
 
-from snow_classifier.utils import IMAGE_DIR
+from snow_classifier.utils import IMAGE_DIR, TRAIN_DIR
+
+rng = random.Random(42)
 
 
 def filter_images_by_date(
@@ -26,17 +29,14 @@ def filter_images_by_date(
     return filtered_images
 
 
-def prepare() -> None:
+def prepare_images() -> None:
+    TRAIN_DIR.mkdir(exist_ok=True)
     snow_dates = [
         ("2023-11-03", "2023-11-08"),
         ("2023-11-11", "2023-11-13"),
         ("2023-11-17", "2024-02-17"),
     ]
     grass_dates = [("2024-04-25", "2024-07-07")]
-    snow_dir = IMAGE_DIR / "snow"
-    grass_dir = IMAGE_DIR / "grass"
-    snow_dir.mkdir(exist_ok=True)
-    grass_dir.mkdir(exist_ok=True)
 
     all_images = sorted(IMAGE_DIR.glob("*.jpg"))
 
@@ -44,15 +44,24 @@ def prepare() -> None:
     snow_images = filter_images_by_date(all_images, snow_dates)
     grass_images = filter_images_by_date(all_images, grass_dates)
 
-    for image in snow_images:
-        image.rename(snow_dir / image.name)
+    for images, category in [(snow_images, "snow"), (grass_images, "grass")]:
+        split_idx = int(len(images) * 0.8)
+        train_images = images[:split_idx]
+        val_images = images[split_idx:]
+        train_dir = IMAGE_DIR / "train" / category
+        val_dir = IMAGE_DIR / "val" / category
+        train_dir.mkdir(parents=True, exist_ok=True)
+        val_dir.mkdir(parents=True, exist_ok=True)
 
-    for image in grass_images:
-        image.rename(grass_dir / image.name)
+        for image in train_images:
+            image.rename(train_dir / image.name)
+
+        for image in val_images:
+            image.rename(val_dir / image.name)
 
     for image in IMAGE_DIR.glob("*.jpg"):
         image.unlink()
 
 
 if __name__ == "__main__":
-    prepare()
+    prepare_images()

@@ -1,6 +1,5 @@
 import logging
 import random
-from pathlib import Path
 from typing import Any
 
 import cv2
@@ -8,18 +7,17 @@ import numpy as np
 import requests
 from tqdm import tqdm
 
+from snow_classifier.utils import IMAGE_DIR
+
 logger = logging.getLogger(__name__)
 rng = random.Random(42)
 prefix = "https://api.panomax.com/1.0/cams/141"
-download_dir = Path("./data/images")
 
 
 def download_images(date_from: str, date_to: str) -> dict[str, str]:
+    IMAGE_DIR.mkdir(exist_ok=True)
     url = f"{prefix}/days?from={date_from}&to={date_to}"
     server_idx = 0
-
-    print(download_dir)
-    download_dir.mkdir(parents=True, exist_ok=True)
 
     days_json: list[dict[str, Any]] = fetch_data(url)
     download_dict: dict[str, str] = {}
@@ -58,7 +56,7 @@ def download_image(date: str, timestamp: str, server_idx: int) -> bool:
     if img is None:
         return False
 
-    output_dir = str(download_dir / f"{date}_{timestamp}.jpg")
+    output_dir = str(IMAGE_DIR / f"{date}_{timestamp}.jpg")
     cv2.imwrite(output_dir, img)
     return True
 

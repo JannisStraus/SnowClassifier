@@ -25,13 +25,6 @@ repos:
         types_or: [html, css, json, javascript, xml, yaml]
         exclude: node_modules
 
-  - repo: https://github.com/macisamuele/language-formatters-pre-commit-hooks
-    rev: v2.14.0
-    hooks:
-      - id: pretty-format-toml
-        args: [--autofix]
-        exclude: pyproject.toml|poetry.lock
-
   - repo: https://github.com/tox-dev/pyproject-fmt
     rev: v2.5.0
     hooks:
