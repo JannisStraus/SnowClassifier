@@ -1,5 +1,7 @@
 import logging
 import random
+from datetime import datetime
+from pathlib import Path
 from typing import Any
 
 import cv2
@@ -11,54 +13,89 @@ from snow_classifier.utils import IMAGE_DIR
 
 logger = logging.getLogger(__name__)
 rng = random.Random(42)
-prefix = "https://api.panomax.com/1.0/cams/141"
+cam_id = 1996
+prefix = f"https://api.panomax.com/1.0/cams/{cam_id}"
+
+
+def download_latest() -> Path | None:
+    date = datetime.now().strftime("%Y-%m-%d")
+    timestamps = get_timestamps(date)
+    if len(timestamps) == 0:
+        return None
+    selection = sorted(timestamps)[-1]
+    server_idx = 1
+
+    image_path = download_image(
+        date, selection, server_idx, image_dir="./", small=False
+    )
+    while image_path is None:
+        if server_idx == 15:
+            raise TimeoutError("Maximum download attempts reached!")
+        server_idx += 1
+        logger.info(f"Retrying with {server_idx = }")
+        image_path = download_image(
+            date, selection, server_idx, image_dir="./", small=False
+        )
+    return image_path
 
 
 def download_images(date_from: str, date_to: str) -> dict[str, str]:
     IMAGE_DIR.mkdir(exist_ok=True)
     url = f"{prefix}/days?from={date_from}&to={date_to}"
-    server_idx = 0
+    server_idx = 1
 
     days_json: list[dict[str, Any]] = fetch_data(url)
     download_dict: dict[str, str] = {}
     for days in tqdm(days_json):
         date = str(days["date"])
-        day_url = f"{prefix}/images/day/{date}"
-        day_json = fetch_data(day_url)
-        if day_json is None:
-            continue
-        timestamps = []
+        timestamps = get_timestamps(date)
+        selection = rng.choice(timestamps)
+        download_dict[date] = selection
+
+        image_path = download_image(date, selection, server_idx)
+        while image_path is None:
+            if server_idx == 15:
+                raise TimeoutError("Maximum download attempts reached!")
+            server_idx += 1
+            logger.info(f"Retrying with {server_idx = }")
+            image_path = download_image(date, selection, server_idx)
+
+    return download_dict
+
+
+def download_image(
+    date: str,
+    timestamp: str,
+    server_idx: int,
+    image_dir: str | Path = IMAGE_DIR,
+    small: bool = True,
+) -> Path | None:
+    image_dir = Path(image_dir)
+    d = date.split("-")
+    suffix = "small" if small else "default"
+    url = f"https://panodata{server_idx}.panomax.com/cams/{cam_id}/{d[0]}/{d[1]}/{d[2]}/{timestamp}_{suffix}.jpg"
+
+    img = fetch_data(url)
+    if img is None:
+        return None
+
+    output_dir = image_dir / f"{date}_{timestamp}.jpg"
+    cv2.imwrite(str(output_dir), img)
+    return output_dir
+
+
+def get_timestamps(date: str) -> list[str]:
+    day_url = f"{prefix}/images/day/{date}"
+    day_json = fetch_data(day_url)
+    timestamps = []
+    if day_json is not None:
         for day in day_json["images"]:
             timestamp = str(day["time"])
             splitted = timestamp.split(":")
             first, second = int(splitted[0]), int(splitted[1])
             if first >= 8 and (first < 16 or (first == 16 and second <= 30)):
                 timestamps.append(timestamp.replace(":", "-"))
-        selection = rng.choice(timestamps)
-        download_dict[date] = selection
-
-        success = download_image(date, selection, server_idx)
-        while not success:
-            if server_idx == 15:
-                raise TimeoutError("Maximum download attempts reached!")
-            server_idx += 1
-            logger.info(f"Retrying with {server_idx = }")
-            success = download_image(date, selection, server_idx)
-
-    return download_dict
-
-
-def download_image(date: str, timestamp: str, server_idx: int) -> bool:
-    d = date.split("-")
-    url = f"https://panodata{server_idx}.panomax.com/cams/141/{d[0]}/{d[1]}/{d[2]}/{timestamp}_small.jpg"
-
-    img = fetch_data(url)
-    if img is None:
-        return False
-
-    output_dir = str(IMAGE_DIR / f"{date}_{timestamp}.jpg")
-    cv2.imwrite(output_dir, img)
-    return True
+    return timestamps
 
 
 def fetch_data(url: str) -> Any:

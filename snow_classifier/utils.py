@@ -1,5 +1,6 @@
+import os
 from pathlib import Path
 
-ROOT_DIR = Path("/local/work/janstraus/datasets/yolo/SnowClassifier")
-IMAGE_DIR = ROOT_DIR / "images"
-TRAIN_DIR = ROOT_DIR / "train"
+OUTPUT_DIR = Path(os.environ["OUTPUT_DIR"])
+IMAGE_DIR = OUTPUT_DIR / "images"
+TRAIN_DIR = OUTPUT_DIR / "train"

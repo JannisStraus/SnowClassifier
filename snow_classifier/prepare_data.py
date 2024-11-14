@@ -32,12 +32,10 @@ def filter_images_by_date(
 def prepare_images() -> None:
     TRAIN_DIR.mkdir(exist_ok=True)
     snow_dates = [
-        ("2023-11-03", "2023-11-08"),
-        ("2023-11-11", "2023-11-13"),
-        ("2023-11-17", "2024-02-17"),
+        ("2023-11-03", "2024-04-05"),
+        ("2024-11-14", "2024-11-14"),
     ]
-    grass_dates = [("2024-04-25", "2024-07-07")]
-
+    grass_dates = [("2024-04-26", "2024-11-12")]
     all_images = sorted(IMAGE_DIR.glob("*.jpg"))
 
     # Filter images for snow and grass date ranges
