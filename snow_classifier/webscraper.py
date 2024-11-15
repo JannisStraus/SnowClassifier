@@ -104,7 +104,9 @@ def process_day(date: str | None, random_time: bool = True) -> tuple[str, str] |
         return None
 
 
-def download_images(date_from: str, date_to: str, max_workers: int | None = None) -> dict[str, str]:
+def download_images(
+    date_from: str, date_to: str, max_workers: int | None = None
+) -> dict[str, str]:
     IMAGE_DIR.mkdir(parents=True, exist_ok=True)
     url = f"{prefix}/days?from={date_from}&to={date_to}"
     days_json: list[dict[str, Any]] = fetch_data(url)
@@ -114,7 +116,8 @@ def download_images(date_from: str, date_to: str, max_workers: int | None = None
     with concurrent.futures.ProcessPoolExecutor(max_workers=max_workers) as executor:
         # Submit parallel tasks for each day
         futures = {
-            executor.submit(process_day, str(day_info["date"])): str(day_info["date"]) for day_info in days_json
+            executor.submit(process_day, str(day_info["date"])): str(day_info["date"])
+            for day_info in days_json
         }
         for future in tqdm(
             concurrent.futures.as_completed(futures),
