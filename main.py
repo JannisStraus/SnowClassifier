@@ -7,20 +7,20 @@ def train_model() -> None:
     snow_dates = [
         ("2022-11-18", "2023-03-21"),
         ("2023-11-03", "2024-04-05"),
-        ("2024-11-14", "2024-11-14"),
     ]
     grass_dates = [
         ("2022-11-14", "2022-11-17"),
         ("2023-04-15", "2023-11-02"),
         ("2024-04-26", "2024-11-13"),
+        ("2024-11-14", "2024-11-16"),
     ]
 
-    download_images("2022-11-14", "2024-11-14")
+    download_images("2022-11-14", "2024-11-16")
     prepare_images(snow_dates, grass_dates)
-    train(10)
+    train(15)
 
 
-def run_model() -> str:
+def run_model() -> None:
     image_dir = download_latest()
 
     if image_dir is None:
@@ -28,7 +28,7 @@ def run_model() -> str:
 
     predicion = infer(image_dir)
     image_dir.unlink()
-    return predicion
+    print(predicion[image_dir.name])
 
 
 if __name__ == "__main__":

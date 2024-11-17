@@ -1,68 +1,41 @@
+import logging
 import random
 from pathlib import Path
+from typing import Any
 
 import cv2
 import numpy as np
 import torch
 from timm import create_model
 from torch import nn, optim
+from torch.types import Device
 from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
 
 from snow_classifier.utils import IMAGE_DIR, TRAIN_DIR
 
+logger = logging.getLogger(__name__)
 
-def infer(image_path: str | Path) -> str:
-    # Define data transformation
-    transform = transforms.Compose(
-        [
-            transforms.ToTensor(),  # OpenCV handles resizing, so we only convert to tensor here
-        ]
-    )
 
-    # Load the trained model with `weights_only=True`
-    model = create_model("fastvit_t8", pretrained=False, num_classes=2)
-    model.load_state_dict(
-        torch.load(TRAIN_DIR / "best.pth", weights_only=True)
-    )  # Explicitly set weights_only=True
-    model.eval()
+def infer(input_path: str | Path) -> dict[str, dict[str, float]]:
+    input_path = Path(input_path)
 
-    # Move model to GPU if available
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model.to(device)
+    # Load the model and device once
+    model, device = load_model()
 
-    # Class labels
-    class_names = ["grass", "snow"]
-
-    # Read the image using OpenCV
-    image = cv2.imread(str(image_path))
-    if image is None:
-        raise FileNotFoundError(f"Image at path {image_path} not found.")
-
-    # Convert BGR (OpenCV format) to RGB
-    image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-
-    # Resize the image to 256x256
-    image = cv2.resize(image, (366, 150))
-
-    # Convert to tensor
-    image = transform(image).unsqueeze(0).to(device)
-
-    with torch.no_grad():
-        outputs = model(image)
-        probabilities = torch.softmax(outputs, dim=1).squeeze(
-            0
-        )  # Apply softmax and remove batch dimension
-
-        # Print all classes with their probabilities
-        for class_name, probability in zip(
-            class_names, probabilities.cpu().numpy(), strict=False
-        ):
-            print(f"{class_name}: {probability:.4f}")
-
-        # Optionally, print the predicted class
-        _, predicted = torch.max(outputs, 1)
-        return class_names[int(predicted.item())]
+    result_dict: dict[str, dict[str, float]] = {}
+    if input_path.is_dir():
+        # Process all .jpg images in the directory
+        for image_file in input_path.glob("*.jpg"):
+            result_dict[image_file.name] = process_image(image_file, model, device)
+    elif input_path.is_file():
+        # Process the single image file
+        result_dict[input_path.name] = process_image(input_path, model, device)
+    else:
+        raise FileNotFoundError(
+            f"The path {input_path} is neither a file nor a directory."
+        )
+    return result_dict
 
 
 def train(epochs: int, seed: int | None = 42) -> None:
@@ -76,15 +49,13 @@ def train(epochs: int, seed: int | None = 42) -> None:
         torch.backends.cudnn.deterministic = True
         torch.backends.cudnn.benchmark = False
 
-    # Define data transformations
+    # Load datasets
     transform = transforms.Compose(
         [
             transforms.Resize((366, 150)),
             transforms.ToTensor(),
         ]
     )
-
-    # Load datasets
     train_dataset = datasets.ImageFolder(root=IMAGE_DIR / "train", transform=transform)
     val_dataset = datasets.ImageFolder(root=IMAGE_DIR / "val", transform=transform)
 
@@ -151,3 +122,56 @@ def train(epochs: int, seed: int | None = 42) -> None:
         _use_new_zipfile_serialization=False,
     )
     print(f"Best model saved with accuracy: {best_accuracy:.4f}")
+
+
+def load_model() -> Any | Device:
+    # Load the trained model
+    model = create_model("fastvit_t8", pretrained=False, num_classes=2)
+    model.load_state_dict(torch.load(TRAIN_DIR / "best.pth", weights_only=True))
+    model.eval()
+
+    # Move model to GPU if available
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model.to(device)
+    return model, device
+
+
+def process_image(
+    image_path: str | Path, model: Any, device: Device
+) -> dict[str, float]:
+    # Read the image using OpenCV
+    image = cv2.imread(str(image_path))
+    if image is None:
+        raise FileNotFoundError(f"Image at path {image_path} not found.")
+
+    # Convert BGR (OpenCV format) to RGB
+    image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+
+    image = cv2.resize(image, (366, 150))
+
+    # Convert to tensor
+    transform = transforms.Compose(
+        [
+            transforms.ToTensor(),  # OpenCV handles resizing, so we only convert to tensor here
+        ]
+    )
+    image = transform(image).unsqueeze(0).to(device)
+
+    class_names = ["grass", "snow"]
+
+    with torch.no_grad():
+        outputs = model(image)
+        probabilities = torch.softmax(outputs, dim=1).squeeze(0)
+
+        # Print all classes with their probabilities
+        result_dict: dict[str, float] = {}
+        for class_name, probability in zip(
+            class_names, probabilities.cpu().numpy(), strict=False
+        ):
+            result_dict[class_name] = probability
+
+        # Get the predicted class
+        _, predicted = torch.max(outputs, 1)
+        predicted_class = class_names[int(predicted.item())]
+        print(f"Predicted class for {image_path}: {predicted_class}")
+        return result_dict

@@ -38,6 +38,8 @@ def prepare_images(
     # Filter images for snow and grass date ranges
     snow_images = filter_images_by_date(all_images, snow_dates)
     grass_images = filter_images_by_date(all_images, grass_dates)
+    rng.shuffle(snow_images)
+    rng.shuffle(grass_images)
 
     for images, category in [(snow_images, "snow"), (grass_images, "grass")]:
         split_idx = int(len(images) * 0.8)

@@ -1,7 +1,7 @@
 import concurrent.futures
 import logging
 import random
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -13,7 +13,6 @@ from tqdm import tqdm
 from snow_classifier.utils import IMAGE_DIR
 
 logger = logging.getLogger(__name__)
-rng = random.Random(42)
 cam_id = 1996
 prefix = f"https://api.panomax.com/1.0/cams/{cam_id}"
 
@@ -79,6 +78,11 @@ def try_download_image(
 def download_latest() -> Path | None:
     date = datetime.now().strftime("%Y-%m-%d")
     timestamps = get_timestamps(date)
+    for day in range(15):
+        date = (datetime.now() - timedelta(days=day)).strftime("%Y-%m-%d")
+        timestamps = get_timestamps(date)
+        if timestamps:
+            break
     if not timestamps:
         return None
     selection = max(timestamps)
@@ -93,6 +97,8 @@ def process_day(date: str | None, random_time: bool = True) -> tuple[str, str] |
         logger.warning(f"No timestamps found for date {date}")
         return None
     if random_time:
+        seed = ",".join(timestamps)
+        rng = random.Random(seed)
         selection = rng.choice(timestamps)
     else:
         selection = max(timestamps)
