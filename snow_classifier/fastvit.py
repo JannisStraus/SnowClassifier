@@ -6,6 +6,7 @@ from typing import Any
 import cv2
 import numpy as np
 import torch
+from cv2.typing import MatLike
 from timm import create_model
 from torch import nn, optim
 from torch.types import Device
@@ -17,7 +18,9 @@ from snow_classifier.utils import IMAGE_DIR, TRAIN_DIR
 logger = logging.getLogger(__name__)
 
 
-def infer(input_path: str | Path) -> dict[str, dict[str, float]]:
+def infer(
+    input_path: str | Path, return_img: bool = False
+) -> dict[str, dict[str, float | MatLike]]:
     input_path = Path(input_path)
 
     # Load the model and device once

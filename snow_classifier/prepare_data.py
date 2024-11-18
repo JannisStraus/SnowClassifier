@@ -29,24 +29,22 @@ def filter_images_by_date(
     return filtered_images
 
 
-def prepare_images(
-    snow_dates: list[tuple[str, str]], grass_dates: list[tuple[str, str]]
-) -> None:
+def prepare_images(date_dict: dict[str, list[tuple[str, str]]]) -> None:
     TRAIN_DIR.mkdir(exist_ok=True)
     all_images = sorted(IMAGE_DIR.glob("*.jpg"))
 
     # Filter images for snow and grass date ranges
-    snow_images = filter_images_by_date(all_images, snow_dates)
-    grass_images = filter_images_by_date(all_images, grass_dates)
-    rng.shuffle(snow_images)
-    rng.shuffle(grass_images)
+    image_dict: dict[str, list[Path]] = {}
+    for class_name, datetime_ranges in date_dict.items():
+        image_dict[class_name] = filter_images_by_date(all_images, datetime_ranges)
+        rng.shuffle(image_dict[class_name])
 
-    for images, category in [(snow_images, "snow"), (grass_images, "grass")]:
+    for class_name, images in image_dict.items():
         split_idx = int(len(images) * 0.8)
         train_images = images[:split_idx]
         val_images = images[split_idx:]
-        train_dir = IMAGE_DIR / "train" / category
-        val_dir = IMAGE_DIR / "val" / category
+        train_dir = IMAGE_DIR / "train" / class_name
+        val_dir = IMAGE_DIR / "val" / class_name
         train_dir.mkdir(parents=True, exist_ok=True)
         val_dir.mkdir(parents=True, exist_ok=True)
 
