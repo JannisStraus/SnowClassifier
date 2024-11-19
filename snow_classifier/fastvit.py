@@ -57,27 +57,18 @@ def train(epochs: int, seed: int | None = 42) -> None:
     )
     train_dataset = datasets.ImageFolder(root=IMAGE_DIR / "train", transform=transform)
     val_dataset = datasets.ImageFolder(root=IMAGE_DIR / "val", transform=transform)
-
-    # Create data loaders
     train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
     val_loader = DataLoader(val_dataset, batch_size=32, shuffle=False)
 
-    # Initialize FastViT model
     model = create_model("fastvit_t8", pretrained=False, num_classes=2)
-
-    # Move model to GPU if available
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model.to(device)
 
-    # Define loss function and optimizer
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.Adam(model.parameters(), lr=0.001)
-
-    # Variable to keep track of the best model performance
     best_accuracy = 0.0  # or negative infinity if tracking loss
-
-    # Training loop
     for epoch in range(epochs):
+        # Training
         model.train()
         running_loss = 0.0
         for inp, lbl in train_loader:
@@ -89,9 +80,9 @@ def train(epochs: int, seed: int | None = 42) -> None:
             optimizer.step()
             running_loss += loss.item() * inputs.size(0)
         epoch_loss = running_loss / len(train_loader.dataset)
-        print(f"Epoch {epoch+1}/{epochs}, Loss: {epoch_loss:.4f}")
+        print(f"Epoch {epoch + 1}/{epochs}, Loss: {epoch_loss:.4f}")
 
-        # Validation loop
+        # Validation
         model.eval()
         correct = 0
         total = 0
