@@ -5,14 +5,14 @@ from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 
 from snow_classifier.run import run_model
-from snow_classifier.utils import cv2_to_buffer
+from snow_classifier.utils import image2buffer
 
 logger = logging.getLogger("snow_classifier")
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     prediction = run_model()
-    io_buf = cv2_to_buffer(prediction["image"])
+    io_buf = image2buffer(prediction["image"])
     caption = f"Predicted class for {prediction['date']} at {prediction['time']}: {prediction['result']}"
 
     await update.message.reply_photo(photo=io_buf, caption=caption)

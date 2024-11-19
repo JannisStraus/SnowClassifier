@@ -1,11 +1,10 @@
-import logging
 import random
 from pathlib import Path
 from typing import Any
 
-import cv2
 import numpy as np
 import torch
+from PIL import Image
 from timm import create_model
 from torch import nn, optim
 from torch.types import Device
@@ -13,8 +12,6 @@ from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
 
 from snow_classifier.utils import IMAGE_DIR, TRAIN_DIR
-
-logger = logging.getLogger(__name__)
 
 
 def infer(
@@ -54,7 +51,7 @@ def train(epochs: int, seed: int | None = 42) -> None:
     # Load datasets
     transform = transforms.Compose(
         [
-            transforms.Resize((366, 150)),
+            transforms.Resize((150, 366)),
             transforms.ToTensor(),
         ]
     )
@@ -138,40 +135,34 @@ def load_model() -> Any | Device:
     return model, device
 
 
-def process_image(image_path: str | Path, model: Any, device: Device) -> dict[str, Any]:
-    # Read the image using OpenCV
-    orig_image = cv2.imread(str(image_path))
-    if orig_image is None:
-        raise FileNotFoundError(f"Image at path {image_path} not found.")
+def process_image(
+    image_path: str | Path, model: Any, device: torch.device
+) -> dict[str, Any]:
+    image = Image.open(image_path).convert("RGB")
+    class_names = ["grass", "snow"]
 
-    image = cv2.cvtColor(orig_image, cv2.COLOR_BGR2RGB)
-    image = cv2.resize(image, (366, 150))
-
-    # Convert to tensor
     transform = transforms.Compose(
         [
-            transforms.ToTensor(),  # OpenCV handles resizing, so we only convert to tensor here
+            transforms.Resize((150, 366)),
+            transforms.ToTensor(),
         ]
     )
     tensor_image = transform(image).unsqueeze(0).to(device)
 
-    class_names = ["grass", "snow"]
-
     with torch.no_grad():
         outputs = model(tensor_image)
+        probabilities = torch.softmax(outputs, dim=1).squeeze(0)
         _, predicted = torch.max(outputs, 1)
-        predicted_class = class_names[int(predicted.item())]
+        predicted_class = class_names[predicted.item()]
 
         result_dict: dict[str, Any] = {
             "result": predicted_class,
-            "predict": {},
-            "image": orig_image,
+            "confidence": {
+                class_name: float(prob)
+                for class_name, prob in zip(
+                    class_names, probabilities.cpu().numpy(), strict=False
+                )
+            },
+            "image": image,
         }
-
-        probabilities = torch.softmax(outputs, dim=1).squeeze(0)
-        for class_name, probability in zip(
-            class_names, probabilities.cpu().numpy(), strict=False
-        ):
-            result_dict["predict"][class_name] = probability
-
-        return result_dict
+    return result_dict

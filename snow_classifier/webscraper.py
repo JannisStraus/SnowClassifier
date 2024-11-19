@@ -2,12 +2,12 @@ import concurrent.futures
 import logging
 import random
 from datetime import datetime, timedelta
+from io import BytesIO
 from pathlib import Path
 from typing import Any
 
-import cv2
-import numpy as np
 import requests
+from PIL import Image
 from tqdm import tqdm
 
 from snow_classifier.utils import IMAGE_DIR
@@ -26,8 +26,7 @@ def fetch_data(url: str) -> Any:
     if content_type == "application/json":
         return response.json()
     elif "image" in content_type:
-        image_array = np.frombuffer(response.content, np.uint8)
-        return cv2.imdecode(image_array, cv2.IMREAD_UNCHANGED)
+        return Image.open(BytesIO(response.content)).convert("RGB")
     else:
         logger.error(f"Unknown content type {content_type} for url {url}")
         return None
@@ -56,11 +55,11 @@ def _download_image(
     year, month, day = date.split("-")
     suffix = "small" if small else "default"
     url = f"https://panodata{server_idx}.panomax.com/cams/{cam_id}/{year}/{month}/{day}/{timestamp}_{suffix}.jpg"
-    img = fetch_data(url)
+    img: Image.Image = fetch_data(url)
     if img is None:
         return None
     output_path = image_dir / f"{date}_{timestamp}_{suffix}.jpg"
-    cv2.imwrite(str(output_path), img)
+    img.save(output_path, format="JPEG")
     return output_path
 
 

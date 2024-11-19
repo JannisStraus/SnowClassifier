@@ -6,4 +6,4 @@ if __name__ == "__main__":
     logging.getLogger("snow_classifier").setLevel(logging.INFO)
 
     train_model()
-    run_model()
+    print(run_model())
