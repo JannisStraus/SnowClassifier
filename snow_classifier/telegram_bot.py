@@ -7,8 +7,7 @@ from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 from snow_classifier.run import run_model
 from snow_classifier.utils import cv2_to_buffer
 
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
+logger = logging.getLogger("snow_classifier")
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -35,4 +34,5 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+    logger.setLevel(logging.INFO)
     main()

@@ -12,8 +12,7 @@ from tqdm import tqdm
 
 from snow_classifier.utils import IMAGE_DIR
 
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
+logger = logging.getLogger("snow_classifier")
 cam_id = 1996
 prefix = f"https://api.panomax.com/1.0/cams/{cam_id}"
 
