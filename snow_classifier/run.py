@@ -1,3 +1,5 @@
+from typing import Any
+
 from snow_classifier.fastvit import infer, train
 from snow_classifier.prepare_data import prepare_images
 from snow_classifier.webscraper import download_images, download_latest
@@ -24,15 +26,20 @@ def train_model() -> None:
     train(5)
 
 
-def run_model() -> None:
+def run_model() -> dict[str, Any]:
     image_dir = download_latest()
 
     if image_dir is None:
         raise ValueError()
 
-    predicion = infer(image_dir)
+    predicion = infer(image_dir)[image_dir.name]
+    datetime = image_dir.name[:16]
+    date, time = datetime[:10], datetime[11:16].replace("-", ":")
+    predicion["date"], predicion["time"] = date, time
+
     image_dir.unlink()
-    predicion[image_dir.name]
+
+    return predicion
 
 
 if __name__ == "__main__":

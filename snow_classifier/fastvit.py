@@ -6,7 +6,6 @@ from typing import Any
 import cv2
 import numpy as np
 import torch
-from cv2.typing import MatLike
 from timm import create_model
 from torch import nn, optim
 from torch.types import Device
@@ -20,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 def infer(
     input_path: str | Path, return_img: bool = False
-) -> dict[str, dict[str, float | MatLike]]:
+) -> dict[str, dict[str, Any]]:
     input_path = Path(input_path)
 
     # Load the model and device once
@@ -139,17 +138,13 @@ def load_model() -> Any | Device:
     return model, device
 
 
-def process_image(
-    image_path: str | Path, model: Any, device: Device
-) -> dict[str, float]:
+def process_image(image_path: str | Path, model: Any, device: Device) -> dict[str, Any]:
     # Read the image using OpenCV
-    image = cv2.imread(str(image_path))
-    if image is None:
+    orig_image = cv2.imread(str(image_path))
+    if orig_image is None:
         raise FileNotFoundError(f"Image at path {image_path} not found.")
 
-    # Convert BGR (OpenCV format) to RGB
-    image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-
+    image = cv2.cvtColor(orig_image, cv2.COLOR_BGR2RGB)
     image = cv2.resize(image, (366, 150))
 
     # Convert to tensor
@@ -158,23 +153,25 @@ def process_image(
             transforms.ToTensor(),  # OpenCV handles resizing, so we only convert to tensor here
         ]
     )
-    image = transform(image).unsqueeze(0).to(device)
+    tensor_image = transform(image).unsqueeze(0).to(device)
 
     class_names = ["grass", "snow"]
 
     with torch.no_grad():
-        outputs = model(image)
-        probabilities = torch.softmax(outputs, dim=1).squeeze(0)
+        outputs = model(tensor_image)
+        _, predicted = torch.max(outputs, 1)
+        predicted_class = class_names[int(predicted.item())]
 
-        # Print all classes with their probabilities
-        result_dict: dict[str, float] = {}
+        result_dict: dict[str, Any] = {
+            "result": predicted_class,
+            "predict": {},
+            "image": orig_image,
+        }
+
+        probabilities = torch.softmax(outputs, dim=1).squeeze(0)
         for class_name, probability in zip(
             class_names, probabilities.cpu().numpy(), strict=False
         ):
-            result_dict[class_name] = probability
+            result_dict["predict"][class_name] = probability
 
-        # Get the predicted class
-        _, predicted = torch.max(outputs, 1)
-        predicted_class = class_names[int(predicted.item())]
-        print(f"Predicted class for {image_path}: {predicted_class}")
         return result_dict

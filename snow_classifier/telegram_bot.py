@@ -1,18 +1,22 @@
+import logging
 import os
-from typing import Any
 
 from telegram import Update
-from telegram.ext import ApplicationBuilder, CommandHandler
+from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 
 from snow_classifier.run import run_model
+from snow_classifier.utils import cv2_to_buffer
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 
-# Define the start command handler
-async def start(update: Update, context: Any) -> None:
-    run_model()
-    await update.message.reply_text(
-        "Hello! I'm your simple bot. Send me a message and I'll echo it back!"
-    )
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    prediction = run_model()
+    io_buf = cv2_to_buffer(prediction["image"])
+    caption = f"Predicted class for {prediction['date']} at {prediction['time']}: {prediction['result']}"
+
+    await update.message.reply_photo(photo=io_buf, caption=caption)
 
 
 def main() -> None:
@@ -26,7 +30,7 @@ def main() -> None:
     app.add_handler(CommandHandler("start", start))
 
     # Start the bot
-    print("Bot is running... Press Ctrl+C to stop.")
+    logger.info("Bot is running... Press Ctrl+C to stop.")
     app.run_polling()
 
 
