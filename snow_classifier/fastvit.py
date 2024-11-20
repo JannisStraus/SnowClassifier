@@ -5,7 +5,7 @@ from typing import Any
 import numpy as np
 import torch
 from PIL import Image
-from timm import create_model
+from timm.models import create_model
 from torch import nn, optim
 from torch.types import Device
 from torch.utils.data import DataLoader

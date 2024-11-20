@@ -10,6 +10,9 @@ from telegram.ext import (
     ContextTypes,
 )
 
+from snow_classifier.run import run_model
+from snow_classifier.utils import image2buffer
+
 logger = logging.getLogger("snow_classifier")
 
 
@@ -23,6 +26,13 @@ class TelegramBot:
         await application.bot.send_message(
             chat_id=self.admin_id, text="🟢 The bot has started successfully"
         )
+
+    async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        prediction = run_model()
+        io_buf = image2buffer(prediction["image"])
+        caption = f"Predicted class for {prediction['date']} at {prediction['time']}: {prediction['result']}"
+
+        await update.message.reply_photo(photo=io_buf, caption=caption)
 
     async def warm_shutdown(self) -> None:
         self.app.stop_running()
@@ -93,6 +103,9 @@ class TelegramBot:
         while self.restart_requested:
             self.restart_requested = False
             self.app = ApplicationBuilder().token(self.token).build()
+
+            # User handlers
+            self.app.add_handler(CommandHandler("start", self.start))
 
             # Admin handlers
             self.app.add_handler(CommandHandler("admin", self.admin))
