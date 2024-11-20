@@ -1,77 +1,125 @@
 import logging
 import os
-import sys
-from functools import partial
 
-from telegram import Update
-from telegram.ext import Application, ApplicationBuilder, CommandHandler, ContextTypes
-
-from snow_classifier.run import run_model
-from snow_classifier.utils import image2buffer
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
+from telegram.ext import (
+    Application,
+    ApplicationBuilder,
+    CallbackQueryHandler,
+    CommandHandler,
+    ContextTypes,
+)
 
 logger = logging.getLogger("snow_classifier")
 
 
-async def post_init(admin_id: int, application: Application) -> None:
-    await application.bot.send_message(
-        chat_id=admin_id, text="🟢 The bot has started successfully"
-    )
+class TelegramBot:
+    def __init__(self) -> None:
+        self.token = os.environ["BOT_TOKEN"]
+        self.admin_id = int(os.environ["ADMIN_ID"])
+        self.restart_requested = False
+
+    async def post_init(self, application: Application) -> None:
+        await application.bot.send_message(
+            chat_id=self.admin_id, text="🟢 The bot has started successfully"
+        )
+
+    async def warm_shutdown(self) -> None:
+        self.app.stop_running()
+
+    async def restart(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        if update.effective_user.id == self.admin_id:
+            logger.info(
+                f"Admin ({self.admin_id}) requested a restart. Restarting the bot..."
+            )
+            await update.message.reply_text("🔄 Restarting the bot...")
+
+            self.restart_requested = True
+            await self.warm_shutdown()
+
+    async def shutdown(
+        self, update: Update, context: ContextTypes.DEFAULT_TYPE
+    ) -> None:
+        if update.effective_user.id == self.admin_id:
+            logger.info(
+                f"Admin ({self.admin_id}) requested a shutdown. Shutting down the bot..."
+            )
+            await self.app.bot.send_message(
+                chat_id=self.admin_id, text="🔴 Shutting down the bot..."
+            )
+            await self.warm_shutdown()
+
+    async def admin(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        if update.effective_user.id == self.admin_id:
+            keyboard = [
+                [
+                    InlineKeyboardButton("Restart", callback_data="admin_restart"),
+                    InlineKeyboardButton("Shutdown", callback_data="admin_shutdown"),
+                ]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            await update.message.reply_text(
+                "Select an option:", reply_markup=reply_markup
+            )
+        else:
+            await update.message.reply_text(
+                "You are not authorized to use this command."
+            )
+
+    async def button(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        query = update.callback_query
+        await query.answer()
+        if update.effective_user.id != self.admin_id:
+            await query.edit_message_text(text="You are not authorized to use this.")
+            return
+
+        if query.data == "admin_restart":
+            logger.info(
+                f"Admin ({self.admin_id}) requested a restart. Restarting the bot..."
+            )
+            await query.edit_message_text(text="🔄 Restarting the bot...")
+            self.restart_requested = True
+            await self.warm_shutdown()
+        elif query.data == "admin_shutdown":
+            logger.info(
+                f"Admin ({self.admin_id}) requested a shutdown. Shutting down the bot..."
+            )
+            await query.edit_message_text(text="🔴 Shutting down the bot...")
+            await self.warm_shutdown()
+
+    def run(self) -> None:
+        self.restart_requested = True
+
+        while self.restart_requested:
+            self.restart_requested = False
+            self.app = ApplicationBuilder().token(self.token).build()
+
+            # Admin handlers
+            self.app.add_handler(CommandHandler("admin", self.admin))
+            self.app.add_handler(CommandHandler("shutdown", self.shutdown))
+            self.app.add_handler(CommandHandler("restart", self.restart))
+            self.app.add_handler(CallbackQueryHandler(self.button))
+            self.app.post_init = self.post_init
+
+            # Start the bot
+            logger.info("Bot is running... Press Ctrl+C to stop.")
+            self.app.run_polling(close_loop=False)
 
 
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    prediction = run_model()
-    io_buf = image2buffer(prediction["image"])
-    caption = f"Predicted class for {prediction['date']} at {prediction['time']}: {prediction['result']}"
-
-    await update.message.reply_photo(photo=io_buf, caption=caption)
+def run() -> None:
+    bot = TelegramBot()
+    bot.run()
 
 
-async def restart(
-    admin_id: int, update: Update, context: ContextTypes.DEFAULT_TYPE
-) -> None:
-    user_id = update.effective_user.id
-    if user_id != admin_id:
-        return
+def run_daemon() -> None:
+    import daemon
 
-    await update.message.reply_text("🔄 Restarting the bot...")
-    logger.info(f"Admin ({admin_id}) requested a restart. Restarting the bot...")
-
-    os.execv(sys.executable, ["python", *sys.argv])
-
-
-async def shutdown(
-    admin_id: int, update: Update, context: ContextTypes.DEFAULT_TYPE
-) -> None:
-    user_id = update.effective_user.id
-    if user_id != admin_id:
-        return
-
-    await update.message.reply_text("🔴 Shutting down the bot...")
-    logger.info(f"Admin ({admin_id}) requested a shutdown. Shutting down the bot...")
-
-    context.application.stop_running()
-
-
-def main() -> None:
-    bot_token = os.environ["BOT_TOKEN"]
-    admin_id = int(os.environ["ADMIN_ID"])
-
-    app = ApplicationBuilder().token(bot_token).build()
-    app.add_handler(CommandHandler("start", start))
-
-    # Admin handler
-    shutdown_func = partial(shutdown, admin_id)
-    restart_func = partial(restart, admin_id)
-    post_init_func = partial(post_init, admin_id)
-    app.add_handler(CommandHandler("shutdown", shutdown_func))
-    app.add_handler(CommandHandler("restart", restart_func))
-    app.post_init = post_init_func
-
-    # Start the bot
-    logger.info("Bot is running... Press Ctrl+C to stop.")
-    app.run_polling()
+    with daemon.DaemonContext():
+        bot = TelegramBot()
+        bot.run()
 
 
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO)
     logger.setLevel(logging.INFO)
-    main()
+    run_daemon()

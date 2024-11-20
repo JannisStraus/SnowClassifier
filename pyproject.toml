@@ -10,19 +10,22 @@ authors = [ "Jannis Straus <jannis.straus@uk-essen.de>" ]
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = "^3.10"
+python = "^3.9"
 requests = "^2.32.3"
 tqdm = "^4.67.0"
 python-dotenv = "^1.0.1"
 numpy = "^1.23.0"
-python-telegram-bot = "^21.7"
 
 [tool.poetry.group.dev.dependencies]
 pre-commit = "^4.0.1"
 poetry-plugin-export = "^1.8.0"
 
+[tool.poetry.group.telegram.dependencies]
+python-telegram-bot = "^21.7"
+python-daemon = "^3.1.0"
+
 [tool.ruff]
-target-version = "py310"
+target-version = "py39"
 
 # Same as Black
 line-length = 88
