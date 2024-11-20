@@ -111,15 +111,7 @@ def run() -> None:
     bot.run()
 
 
-def run_daemon() -> None:
-    import daemon
-
-    with daemon.DaemonContext():
-        bot = TelegramBot()
-        bot.run()
-
-
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
     logger.setLevel(logging.INFO)
-    run_daemon()
+    run()
